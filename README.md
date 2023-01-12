@@ -26,7 +26,7 @@ The features of MSCOCO 2014 are extracted by previous works: [coco_bu_feats](htt
 You can also extract image features of MSCOCO 2014 using [resnet model](https://drive.google.com/open?id=0B7fNdx_jAqhtbVYzOURMdDNHSGM), and [swin transformer model](https://github.com/microsoft/Swin-Transformer)
 
 ## Training
-The core code are given in the models/TSGMModel2.py
+The core code are given in the models/TSGMModel3.py
 ```bash
 python train_tsg.py --cfg tsg_configs/tsgmt1.yml
 ```

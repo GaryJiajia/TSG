@@ -1,5 +1,5 @@
 #155.69.150.31
-caption_model: tsgm2
+caption_model: tsgm3
 id: tsgmt1
 checkpoint_path: tsgmt1
 gpu: 0
