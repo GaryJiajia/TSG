@@ -30,3 +30,8 @@ The core code are given in the models/TSGMModel3.py
 ```bash
 python train_tsg.py --cfg tsg_configs/tsgmt1.yml
 ```
+
+## Evaluation
+```bash
+python eval_tsg.py --dump_images 0 --num_images 5000 --model tsgmt1/modeltsgmt10011.pth --infos_path tsgmt1/infos_tsgmt10011.pkl  --language_eval 1 --beam_size 5
+```
