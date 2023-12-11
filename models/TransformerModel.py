@@ -36,16 +36,16 @@ class EncoderDecoder(nn.Module):
         self.tgt_embed = tgt_embed
         self.generator = generator
         
-    def forward(self, src, tgt, src_mask, src_tgt_mask, tgt_mask):
+    def forward(self, src, tgt, src_mask, tgt_mask):
         "Take in and process masked src and target sequences."
-        return self.decode(self.encode(src, src_mask), src_tgt_mask,
+        return self.decode(self.encode(src, src_mask), src_mask,
                             tgt, tgt_mask)
     
     def encode(self, src, src_mask):
         return self.encoder(self.src_embed(src), src_mask)
     
-    def decode(self, memory, src_tgt_mask, tgt, tgt_mask):
-        return self.decoder(self.tgt_embed(tgt), memory, src_tgt_mask, tgt_mask)
+    def decode(self, memory, src_mask, tgt, tgt_mask):
+        return self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
 
 class Generator(nn.Module):
     "Define standard linear + softmax generation step."
@@ -159,8 +159,6 @@ def attention(query, key, value, mask=None, dropout=None):
     d_k = query.size(-1)
     scores = torch.matmul(query, key.transpose(-2, -1)) \
              / math.sqrt(d_k)
-    # print(scores.shape)
-    # print(mask.shape)
     if mask is not None:
         scores = scores.masked_fill(mask == 0, -1e9)
     p_attn = F.softmax(scores, dim = -1)
@@ -241,7 +239,7 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:, :x.size(1)]
         return self.dropout(x)
 
-class TSGModel(AttModel):
+class TransformerModel(AttModel):
 
     def make_model(self, src_vocab, tgt_vocab, N_enc=6, N_dec=6, 
                d_model=512, d_ff=2048, h=8, dropout=0.1):
@@ -266,7 +264,7 @@ class TSGModel(AttModel):
         return model
 
     def __init__(self, opt):
-        super(TSGModel, self).__init__(opt)
+        super(TransformerModel, self).__init__(opt)
         self.opt = opt
         # self.config = yaml.load(open(opt.config_file))
         
@@ -282,12 +280,6 @@ class TSGModel(AttModel):
         self.att_embed = nn.Sequential(*(
                                     ((nn.BatchNorm1d(self.att_feat_size),) if self.use_bn else ())+
                                     (nn.Linear(self.att_feat_size, self.d_model),
-                                    nn.ReLU(),
-                                    nn.Dropout(self.drop_prob_lm))+
-                                    ((nn.BatchNorm1d(self.d_model),) if self.use_bn==2 else ())))
-        self.rela_embed = nn.Sequential(*(
-                                    ((nn.BatchNorm1d(self.att_feat_size),) if self.use_bn else ())+
-                                    (nn.Embedding(500, self.d_model),
                                     nn.ReLU(),
                                     nn.Dropout(self.drop_prob_lm))+
                                     ((nn.BatchNorm1d(self.d_model),) if self.use_bn==2 else ())))
@@ -316,25 +308,21 @@ class TSGModel(AttModel):
     def init_hidden(self, bsz):
         return []
 
-    def _prepare_feature(self, att_feats, att_masks, enc_self_masks, rela_seq, rela_len, attr_len, att_len):
-        att_feats, seq, att_masks, seq_mask, enc_self_masks = self._prepare_feature_forward(att_feats, att_masks,
-                                                                                            enc_self_masks, rela_seq,
-                                                                                            rela_len, attr_len, att_len,)
-        memory = self.model.encode(att_feats, enc_self_masks)
+    def _prepare_feature(self, fc_feats, att_feats, att_masks):
 
-        return memory, att_masks, seq_mask, enc_self_masks
+        att_feats, seq, att_masks, seq_mask = self._prepare_feature_forward(att_feats, att_masks)
+        memory = self.model.encode(att_feats, att_masks)
 
-    def _prepare_feature_forward(self, att_feats, att_masks, enc_self_masks, rela_seq, rela_len, attr_len, att_len, seq=None):
+        return fc_feats[...,:0], att_feats[...,:0], memory, att_masks
+
+    def _prepare_feature_forward(self, att_feats, att_masks=None, seq=None):
         att_feats, att_masks = self.clip_att(att_feats, att_masks)
 
-        # att_feats = pack_wrapper(self.att_embed, att_feats, att_masks)
         att_feats = self.att_embed(att_feats)
-        rela_feats = self.rela_embed(rela_seq)
+        # att_feats = pack_wrapper(self.att_embed, att_feats, att_masks)
 
-        for i in range(len(rela_len)):
-            att_feats[i,int(att_len[i]):int(att_len[i]+attr_len[i]),:] = rela_feats[i,:int(attr_len[i]),:] + rela_feats[i,int(attr_len[i]):int(2*attr_len[i]),:]
-            att_feats[i,int(att_len[i]+attr_len[i]):int(att_len[i]+attr_len[i]+rela_len[i]), :] = rela_feats[i,int(2*attr_len[i]):int(2*attr_len[i]+rela_len[i]),:]
-
+        if att_masks is None:
+            att_masks = att_feats.new_ones(att_feats.shape[:2], dtype=torch.long)
         att_masks = att_masks.unsqueeze(-2)
 
         if seq is not None:
@@ -351,23 +339,24 @@ class TSGModel(AttModel):
                 att_feats, att_masks = utils.repeat_tensors(seq_per_img,
                     [att_feats, att_masks]
                 )
-                enc_self_masks = utils.repeat_tensors(seq_per_img, enc_self_masks)
         else:
             seq_mask = None
 
         #seq: 17, [0,7961,xxx,] seq_mask: 17, [[1,0,0],[1,1,0]]
-        return att_feats, seq, att_masks, seq_mask, enc_self_masks
+        return att_feats, seq, att_masks, seq_mask
 
-    def _forward(self, fc_feats, att_feats, seq, att_masks, enc_self_masks, rela_seq, rela_len, attr_len, att_len):
+    def _forward(self, fc_feats, att_feats, seq, att_masks=None):
         if seq.ndim == 3:  # B * seq_per_img * seq_len
             seq = seq.reshape(-1, seq.shape[2])
-        att_feats, seq, att_masks, seq_mask, enc_self_masks = self._prepare_feature_forward(att_feats, att_masks, enc_self_masks, rela_seq, rela_len, attr_len, att_len, seq)
+        att_feats, seq, att_masks, seq_mask = self._prepare_feature_forward(att_feats, att_masks, seq)
 
-        out = self.model(att_feats, seq, enc_self_masks, att_masks, seq_mask)
+        out = self.model(att_feats, seq, att_masks, seq_mask)
+
         outputs = self.model.generator(out)
         return outputs
+        # return torch.cat([_.unsqueeze(1) for _ in outputs], 1)
 
-    def core(self, it, memory, state, mask):
+    def core(self, it, fc_feats_ph, att_feats_ph, memory, state, mask):
         """
         state = [ys.unsqueeze(0)]
         """
@@ -380,159 +369,3 @@ class TSGModel(AttModel):
                                subsequent_mask(ys.size(1), self.all_former)
                                         .to(memory.device))
         return out[:, -1], [ys.unsqueeze(0)]
-
-    def _sample(self, fc_feats, att_feats, att_masks, enc_self_masks, rela_seq, rela_len, attr_len, att_len, opt={}):
-
-        sample_method = opt.get('sample_method', 'greedy')
-        beam_size = opt.get('beam_size', 1)
-        temperature = opt.get('temperature', 1.0)
-        sample_n = int(opt.get('sample_n', 1))
-        group_size = opt.get('group_size', 1)
-        output_logsoftmax = opt.get('output_logsoftmax', 1)
-        decoding_constraint = opt.get('decoding_constraint', 0)
-        block_trigrams = opt.get('block_trigrams', 0)
-        remove_bad_endings = opt.get('remove_bad_endings', 0)
-        if beam_size > 1:
-            return self._sample_beam(fc_feats, att_feats, att_masks, enc_self_masks, rela_seq, rela_len, attr_len, att_len,  opt)
-        if group_size > 1:
-            return self._diverse_sample(fc_feats, att_feats, att_masks, opt)
-
-        batch_size = fc_feats.size(0)
-        state = self.init_hidden(batch_size * sample_n)
-        att_feats, att_masks, seq_mask, enc_self_masks = self._prepare_feature(att_feats, att_masks,enc_self_masks, rela_seq,rela_len, attr_len, att_len)
-
-        if sample_n > 1:
-           att_feats, att_masks = utils.repeat_tensors(sample_n,
-                [att_feats, att_masks]
-            )
-
-        trigrams = []  # will be a list of batch_size dictionaries
-
-        seq = fc_feats.new_zeros((batch_size * sample_n, self.seq_length), dtype=torch.long)
-        seqLogprobs = fc_feats.new_zeros(batch_size * sample_n, self.seq_length, self.vocab_size + 1)
-        for t in range(self.seq_length + 1):
-            if t == 0:  # input <bos>
-                it = fc_feats.new_zeros(batch_size * sample_n, dtype=torch.long)
-
-            logprobs, state = self.get_logprobs_state(it, att_feats, att_masks, state,
-                                                      output_logsoftmax=output_logsoftmax)
-
-            if decoding_constraint and t > 0:
-                tmp = logprobs.new_zeros(logprobs.size())
-                tmp.scatter_(1, seq[:, t - 1].data.unsqueeze(1), float('-inf'))
-                logprobs = logprobs + tmp
-
-            if remove_bad_endings and t > 0:
-                tmp = logprobs.new_zeros(logprobs.size())
-                prev_bad = np.isin(seq[:, t - 1].data.cpu().numpy(), self.bad_endings_ix)
-                # Make it impossible to generate bad_endings
-                tmp[torch.from_numpy(prev_bad.astype('uint8')), 0] = float('-inf')
-                logprobs = logprobs + tmp
-
-            # Mess with trigrams
-            # Copy from https://github.com/lukemelas/image-paragraph-captioning
-            if block_trigrams and t >= 3:
-                # Store trigram generated at last step
-                prev_two_batch = seq[:, t - 3:t - 1]
-                for i in range(batch_size):  # = seq.size(0)
-                    prev_two = (prev_two_batch[i][0].item(), prev_two_batch[i][1].item())
-                    current = seq[i][t - 1]
-                    if t == 3:  # initialize
-                        trigrams.append({prev_two: [current]})  # {LongTensor: list containing 1 int}
-                    elif t > 3:
-                        if prev_two in trigrams[i]:  # add to list
-                            trigrams[i][prev_two].append(current)
-                        else:  # create list
-                            trigrams[i][prev_two] = [current]
-                # Block used trigrams at next step
-                prev_two_batch = seq[:, t - 2:t]
-                mask = torch.zeros(logprobs.size(), requires_grad=False).cuda()  # batch_size x vocab_size
-                for i in range(batch_size):
-                    prev_two = (prev_two_batch[i][0].item(), prev_two_batch[i][1].item())
-                    if prev_two in trigrams[i]:
-                        for j in trigrams[i][prev_two]:
-                            mask[i, j] += 1
-                # Apply mask to log probs
-                # logprobs = logprobs - (mask * 1e9)
-                alpha = 2.0  # = 4
-                logprobs = logprobs + (mask * -0.693 * alpha)  # ln(1/2) * alpha (alpha -> infty works best)
-
-            # sample the next word
-            if t == self.seq_length:  # skip if we achieve maximum length
-                break
-            it, sampleLogprobs = self.sample_next_word(logprobs, sample_method, temperature)
-
-            # stop when all finished
-            if t == 0:
-                unfinished = it > 0
-            else:
-                unfinished = unfinished * (it > 0)
-            it = it * unfinished.type_as(it)
-            seq[:, t] = it
-            seqLogprobs[:, t] = logprobs
-            # quit loop if all sequences have finished
-            if unfinished.sum() == 0:
-                break
-
-        return seq, seqLogprobs
-
-    def _sample_beam(self, fc_feats, att_feats, att_masks, enc_self_masks, rela_seq, rela_len, attr_len, att_len, opt={}):
-        beam_size = opt.get('beam_size', 10)
-        group_size = opt.get('group_size', 1)
-        sample_n = opt.get('sample_n', 10)
-        # when sample_n == beam_size then each beam is a sample.
-        assert sample_n == 1 or sample_n == beam_size // group_size, 'when beam search, sample_n == 1 or beam search'
-        batch_size = fc_feats.size(0)
-
-        att_feats, att_masks, seq_mask, enc_self_masks = self._prepare_feature(att_feats, att_masks, enc_self_masks,
-                                                                               rela_seq, rela_len, attr_len, att_len)
-
-        assert beam_size <= self.vocab_size + 1, 'lets assume this for now, otherwise this corner case causes a few headaches down the road. can be dealt with in future if needed'
-        seq = fc_feats.new_zeros((batch_size * sample_n, self.seq_length), dtype=torch.long)
-        seqLogprobs = fc_feats.new_zeros(batch_size * sample_n, self.seq_length, self.vocab_size + 1)
-        # lets process every image independently for now, for simplicity
-
-        self.done_beams = [[] for _ in range(batch_size)]
-
-        state = self.init_hidden(batch_size)
-
-        # first step, feed bos
-        it = fc_feats.new_zeros([batch_size], dtype=torch.long)
-
-
-        logprobs, state = self.get_logprobs_state(it, att_feats, att_masks, state)
-        att_feats, att_masks = utils.repeat_tensors(beam_size,
-                                                    [att_feats, att_masks]
-                                                    )
-
-        # logprobs, state = self.get_logprobs_state(it, p_fc_feats, p_att_feats, pp_att_feats, p_att_masks, state)
-        # p_fc_feats, p_att_feats, pp_att_feats, p_att_masks = utils.repeat_tensors(beam_size,
-        #                                                                           [p_fc_feats, p_att_feats,
-        #                                                                            pp_att_feats, p_att_masks]
-        #                                                                           )
-        self.done_beams = self.beam_search(state, logprobs, att_feats, att_masks, opt=opt)
-        for k in range(batch_size):
-            if sample_n == beam_size:
-                for _n in range(sample_n):
-                    seq_len = self.done_beams[k][_n]['seq'].shape[0]
-                    seq[k * sample_n + _n, :seq_len] = self.done_beams[k][_n]['seq']
-                    seqLogprobs[k * sample_n + _n, :seq_len] = self.done_beams[k][_n]['logps']
-            else:
-                seq_len = self.done_beams[k][0]['seq'].shape[0]
-                seq[k, :seq_len] = self.done_beams[k][0]['seq']  # the first beam has highest cumulative score
-                seqLogprobs[k, :seq_len] = self.done_beams[k][0]['logps']
-        # return the samples and their log likelihoods
-        return seq, seqLogprobs
-
-
-    def get_logprobs_state(self, it, att_feats, att_masks, state, output_logsoftmax=1):
-        # 'it' contains a word index
-        xt = self.embed(it)
-
-        output, state = self.core(xt, att_feats, state, att_masks)
-        if output_logsoftmax:
-            logprobs = F.log_softmax(self.logit(output), dim=1)
-        else:
-            logprobs = self.logit(output)
-
-        return logprobs, state

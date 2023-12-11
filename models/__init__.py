@@ -13,15 +13,16 @@ from .ShowTellModel import ShowTellModel
 from .FCModel import FCModel
 from .AttModel import *
 from .TransformerModel import TransformerModel
-from .BertCapModel import BertCapModel
-from .M2Transformer import M2TransformerModel
-from .FTTransformerModel import FTTransformerModel
-from .ITransformerModel import ITransformerModel
-from .TTransformerModel import TTransformerModel
-from .NTransformerModel import NTransformerModel
+# from .BertCapModel import BertCapModel
+# from .M2Transformer import M2TransformerModel
+# from .FTTransformerModel import FTTransformerModel
+# from .ITransformerModel import ITransformerModel
+# from .TTransformerModel import TTransformerModel
+# from .NTransformerModel import NTransformerModel
 from .TSGModel import TSGModel
-from .TSGMModel import TSGMModel
+# from .TSGMModel import TSGMModel
 from .TSGMModel2 import TSGMModel2
+from .TSGMModel3 import TSGMModel3
 
 def setup(opt):
     if opt.caption_model in ['fc', 'show_tell']:
@@ -63,22 +64,24 @@ def setup(opt):
     # Transformer
     elif opt.caption_model == 'transformer':
         model = TransformerModel(opt)
-    elif opt.caption_model == 'bert':
-        model = BertCapModel(opt)
-    elif opt.caption_model == 'm2transformer':
-        model = M2TransformerModel(opt)
-    elif opt.caption_model == 'fttransformer':
-        model = FTTransformerModel(opt)
-    elif opt.caption_model == 'itransformer':
-        model = ITransformerModel(opt)
-    elif opt.caption_model == 'ttransformer':
-        model = TTransformerModel(opt)
+    # elif opt.caption_model == 'bert':
+    #     model = BertCapModel(opt)
+    # elif opt.caption_model == 'm2transformer':
+    #     model = M2TransformerModel(opt)
+    # elif opt.caption_model == 'fttransformer':
+    #     model = FTTransformerModel(opt)
+    # elif opt.caption_model == 'itransformer':
+    #     model = ITransformerModel(opt)
+    # elif opt.caption_model == 'ttransformer':
+    #     model = TTransformerModel(opt)
     elif opt.caption_model == 'tsg':
         model = TSGModel(opt)
-    elif opt.caption_model == 'tsgm':
-        model = TSGMModel(opt)
+    # elif opt.caption_model == 'tsgm':
+    #     model = TSGMModel(opt)
     elif opt.caption_model == 'tsgm2':
         model = TSGMModel2(opt)
+    elif opt.caption_model == 'tsgm3':
+        model = TSGMModel3(opt)
     else:
         raise Exception("Caption model not supported: {}".format(opt.caption_model))
 

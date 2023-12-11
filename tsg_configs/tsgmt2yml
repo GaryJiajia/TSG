@@ -1,6 +1,6 @@
 caption_model: tsgm3
-id: tsgmt1
-checkpoint_path: tsgmt1
+id: tsgmt2
+checkpoint_path: tsgmt2
 gpu: 0
 # start_from: 4
 
@@ -9,38 +9,43 @@ noamopt_warmup: 20000
 label_smoothing: 0.0
 input_json: data/cocobu.json
 input_label_h5: data/cocobu_label.h5
-input_att_dir: data/cocobu_att
-input_rela_dir: data/coco_pred_sg
+# use swin_feats here
+input_att_dir: coco_swin_feats
+input_rela_dir: coco_pred_sg
 seq_per_img: 5
-batch_size: 14
+batch_size: 20
 learning_rate: 0.0005
 reduce_on_plateau: false
 
+# N=num_layers
+# d_model=input_encoding_size
+# d_ff=rnn_size
 num_layers: 6
 input_encoding_size: 512
-rnn_size: 2048
+rnn_size: 1536
 
 # Transformer config
 N_enc: 6
 N_dec: 6
 d_model: 512
-d_ff: 2048
+d_ff: 1536
 num_att_heads: 8
 dropout: 0.1
+att_feat_size: 1536
 
 learning_rate_decay_start: 0
 scheduled_sampling_start: -1
 save_checkpoint_every: 30000
-rp_decay_every: 3000
+rp_decay_every: 5000
 language_eval: 1
 val_images_use: 5000
 train_sample_n: 5
 
 
 self_critical_after: -1
-structure_after: 15
+structure_after: 20
 noamopt_rl: false
-learning_rate_rl: 0.00005
+learning_rate_rl: 0.00001
 learning_rate_decay_start_rl: -1
 reduce_on_plateau_rl: true
 
@@ -48,6 +53,6 @@ train_sample_n_rl: 5
 structure_loss_weight: 1
 structure_loss_type: new_self_critical
 
-max_epochs: 60
+max_epochs: 50
 concat_type: 1
 controller: 1

@@ -29,9 +29,9 @@ class HybridLoader:
             if self.db_path=='data/coco_pred_sg':
                 self.loader = lambda x: np.load(x,allow_pickle=True,encoding="latin1").item()
             else:
-                self.loader = lambda x: np.load(x)
+                self.loader = lambda x: np.load(x,allow_pickle=True)
         else:
-            self.loader = lambda x: np.load(x)['feat']
+            self.loader = lambda x: np.load(x,allow_pickle=True)['feat']
         if db_path.endswith('.lmdb'):
             self.db_type = 'lmdb'
             self.env = lmdb.open(db_path, subdir=os.path.isdir(db_path),

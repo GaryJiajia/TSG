@@ -11,7 +11,7 @@ import numpy as np
 
 import time
 import os
-from six.moves import cPickle
+# from six.moves import cPickle
 import traceback
 from collections import defaultdict
 
@@ -35,7 +35,7 @@ def add_summary_value(writer, key, value, iteration):
         writer.add_scalar(key, value, iteration)
 
 def train(opt):
-    transformer_based_models=['transformer', 'bert', 'm2transformer', 'ttransformer', 'ntransformer','tsg','tsgm','tsgm2']
+    transformer_based_models=['transformer', 'bert', 'm2transformer', 'ttransformer', 'ntransformer','tsg','tsgm','tsgm2','tsgm3']
 
     ################################
     # Build dataloader
