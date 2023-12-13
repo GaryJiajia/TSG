@@ -1,11 +1,19 @@
 # TFSGC
 
-<font size='5'>**Transforming Visual Scene Graphs to Image Captions**</font>
-<font size='2'>**The 61st Annual Meeting of the Association for Computational Linguistics (ACL2023)  main conference**</font>
+The repository for our paper: **Transforming Visual Scene Graphs to Image Captions**
 
 <a href='https://github.com/GaryJiajia/TSG'><img src='https://img.shields.io/badge/Project-Page-Green'></a> <a href='https://arxiv.org/pdf/2305.02177.pdf'><img src='https://img.shields.io/badge/Paper-Arxiv-red'></a> 
 
-## Install
+<a href='https://aclanthology.org/2023.acl-long.694/'>The 61st Annual Meeting of the Association for Computational Linguistics (ACL2023)  main conference</a>
+
+## Table of Contents
+- [Installation](#installation)
+- [Data preparing](#Data-preparing)
+- [Training](#training)
+- [Evaluation](#evaluation)
+- [Citing](#citing)
+
+## Installation
 ```bash
 git clone https://github.com/GaryJiajia/TSG.git
 cd TSG
@@ -81,3 +89,17 @@ $ python eval_tsg.py --input_json data/cocotest.json --input_fc_dir data/cocotes
 ```
 
 You can download the preprocessed file `cocotest.json`, `cocotest_bu_att` and `cocotest_bu_fc` from [link](https://drive.google.com/open?id=1eCdz62FAVCGogOuNhy87Nmlo5_I0sH2J) according to [ruotianluo/ImageCaptioning](https://github.com/ruotianluo/ImageCaptioning.pytorch/tree/master).
+
+## Citing
+If you found this repository useful, please consider citing:
+```
+@inproceedings{yang-etal-2023-transforming,
+    title = "Transforming Visual Scene Graphs to Image Captions",
+    author = "Yang, Xu and Peng, Jiawei and Wang, Zihua and Xu, Haiyang and Ye, Qinghao and Li, Chenliang and Huang, Songfang and Huang, Fei and Li, Zhangzikang and Zhang, Yu",
+    booktitle = "Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)",
+    year = "2023",
+    publisher = "Association for Computational Linguistics",
+    doi = "10.18653/v1/2023.acl-long.694",
+    pages = "12427--12440",
+}
+```
